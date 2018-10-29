@@ -1,3 +1,11 @@
+import com.fasterxml.jackson.databind.JsonNode;
+//import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.apache.kafka.common.serialization.Deserializer;
+import org.apache.kafka.common.serialization.Serializer;
+import org.apache.kafka.connect.json.JsonDeserializer;
+import org.apache.kafka.connect.json.JsonSerializer;
 import serde.SpecificAvroSerde;
 import io.confluent.kafka.serializers.AbstractKafkaAvroSerDeConfig;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -17,6 +25,56 @@ public class KafkaStreamBasket {
 
     private final static String SCHEMA_REGISTRY_URL = "http://localhost:8081";
 
+//    public static class JSONSerde<T extends JSONSerdeCompatible> implements Serializer<T>, Deserializer<T>, Serde<T> {
+//        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+//
+//        @Override
+//        public void configure(final Map<String, ?> configs, final boolean isKey) {}
+//
+//        @SuppressWarnings("unchecked")
+//        @Override
+//        public T deserialize(final String topic, final byte[] data) {
+//            if (data == null) {
+//                return null;
+//            }
+//
+//            try {
+//                return (T) OBJECT_MAPPER.readValue(data, JSONSerdeCompatible.class);
+//            } catch (final IOException e) {
+//                throw new SerializationException(e);
+//            }
+//        }
+//
+//        @Override
+//        public byte[] serialize(final String topic, final T data) {
+//            if (data == null) {
+//                return null;
+//            }
+//
+//            try {
+//                return OBJECT_MAPPER.writeValueAsBytes(data);
+//            } catch (final Exception e) {
+//                throw new SerializationException("Error serializing JSON message", e);
+//            }
+//        }
+//
+//        @Override
+//        public void close() {}
+//
+//        @Override
+//        public Serializer<T> serializer() {
+//            return this;
+//        }
+//
+//        @Override
+//        public Deserializer<T> deserializer() {
+//            return this;
+//        }
+//    }
+
+
+
+
 
     public static void main(String... args) throws Exception {
 
@@ -32,6 +90,11 @@ public class KafkaStreamBasket {
         settings.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 10 * 1000);
         settings.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
+        final Serializer<JsonNode> jsonSerializer = new JsonSerializer();
+        final Deserializer<JsonNode> jsonDeserializer = new JsonDeserializer();
+        final Serde<JsonNode> jsonSerde = Serdes.serdeFrom(jsonSerializer, jsonDeserializer);
+
+
         final Serde<String> stringSerde = Serdes.String();
         final Serde<prices> specificAvroSerde = new SpecificAvroSerde<>();
         final boolean isKeySerde = false;
@@ -44,13 +107,26 @@ public class KafkaStreamBasket {
 
         KStream<String, prices> prices = builder.stream("confluent-in-prices");
 
-        KStream<String, String> priceOutput = prices.map((key, value) -> new KeyValue<String, Long>(value.getItem().toString(), value.getPrice().longValue()))
+        KStream<JsonNode, JsonNode> priceOutput = prices.map((key, value) -> new KeyValue<String, Long>(value.getItem().toString(), value.getPrice().longValue()))
                 .filter((key, value) -> value >= 1000)
-                .map((key, value) -> new KeyValue<>(key, value.toString()));
+                .map((key, value) -> new KeyValue<>(key, value.toString()))
+                .map( (key, value) -> {
+
+                    final ObjectNode keyNode = JsonNodeFactory.instance.objectNode();
+
+                    keyNode.put("item", key);
+
+                    final ObjectNode valueNode = JsonNodeFactory.instance.objectNode();
+
+                    valueNode.put("price", value);
+
+                    return new KeyValue<>((JsonNode) keyNode, (JsonNode) valueNode);
+
+                });
 
 
 
-        priceOutput.to(stringSerde, stringSerde,"confluent-out-prices");
+        priceOutput.to(jsonSerde, jsonSerde,"confluent-out-prices");
 
 
         KafkaStreams streams = new KafkaStreams(builder, config);
