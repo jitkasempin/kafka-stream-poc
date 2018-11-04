@@ -25,57 +25,6 @@ public class KafkaStreamBasket {
 
     private final static String SCHEMA_REGISTRY_URL = "http://localhost:8081";
 
-//    public static class JSONSerde<T extends JSONSerdeCompatible> implements Serializer<T>, Deserializer<T>, Serde<T> {
-//        private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-//
-//        @Override
-//        public void configure(final Map<String, ?> configs, final boolean isKey) {}
-//
-//        @SuppressWarnings("unchecked")
-//        @Override
-//        public T deserialize(final String topic, final byte[] data) {
-//            if (data == null) {
-//                return null;
-//            }
-//
-//            try {
-//                return (T) OBJECT_MAPPER.readValue(data, JSONSerdeCompatible.class);
-//            } catch (final IOException e) {
-//                throw new SerializationException(e);
-//            }
-//        }
-//
-//        @Override
-//        public byte[] serialize(final String topic, final T data) {
-//            if (data == null) {
-//                return null;
-//            }
-//
-//            try {
-//                return OBJECT_MAPPER.writeValueAsBytes(data);
-//            } catch (final Exception e) {
-//                throw new SerializationException("Error serializing JSON message", e);
-//            }
-//        }
-//
-//        @Override
-//        public void close() {}
-//
-//        @Override
-//        public Serializer<T> serializer() {
-//            return this;
-//        }
-//
-//        @Override
-//        public Deserializer<T> deserializer() {
-//            return this;
-//        }
-//    }
-
-
-
-
-
     public static void main(String... args) throws Exception {
 
         KStreamBuilder builder = new KStreamBuilder();
@@ -118,6 +67,7 @@ public class KafkaStreamBasket {
 
                     final ObjectNode valueNode = JsonNodeFactory.instance.objectNode();
 
+                    valueNode.put("item", key);
                     valueNode.put("price", value);
 
                     return new KeyValue<>((JsonNode) keyNode, (JsonNode) valueNode);
